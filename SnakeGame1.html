@@ -43,7 +43,7 @@
         <!-- Score and Message Display -->
         <div class="flex justify-between items-center w-full max-w-lg px-4">
             <div id="score" class="text-2xl text-green-400">Score: 0</div>
-            <div id="message-box" class="text-xl text-red-400 text-center"></div>
+            <div id="message-box" class="text-xl text-red-400 text-center">Press Start to Play!</div>
         </div>
 
         <!-- Canvas for the game -->
@@ -52,7 +52,7 @@
         <!-- Game Controls -->
         <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 w-full max-w-lg">
             <button id="startButton" class="btn-game bg-green-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-green-600">Start</button>
-            <button id="pauseButton" class="btn-game bg-yellow-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-yellow-600">Pause</button>
+            <button id="pauseButton" class="btn-game bg-yellow-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-yellow-600" disabled>Pause</button>
             <button id="resetButton" class="btn-game bg-red-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-red-600">Reset</button>
         </div>
     </div>
@@ -73,15 +73,16 @@
             const CANVAS_SIZE = 400; // Total canvas width/height
             const GAME_SPEED = 100; // Game loop speed in milliseconds
             
-            let snake = [{ x: 10, y: 10 }]; // Initial snake position
+            let snake = [];
             let food = {};
             let direction = 'right';
             let score = 0;
             let isGameOver = true;
             let isPaused = false;
-            let lastDirection = 'right'; // To prevent reversing direction
+            let lastDirection = 'right';
             let touchStartX = 0;
             let touchStartY = 0;
+            let gameIntervalId; // Store the interval ID to clear it later
 
             // --- CORE GAME FUNCTIONS ---
 
@@ -125,8 +126,8 @@
                 }
 
                 // Check for self-collision
-                for (const segment of snake) {
-                    if (head.x === segment.x && head.y === segment.y) {
+                for (let i = 1; i < snake.length; i++) {
+                    if (head.x === snake[i].x && head.y === snake[i].y) {
                         gameOver();
                         return;
                     }
@@ -153,7 +154,6 @@
             function gameLoop() {
                 update();
                 draw();
-                setTimeout(gameLoop, GAME_SPEED);
             }
 
             // Generate new food at a random position
@@ -167,25 +167,35 @@
             // Handle game over state
             function gameOver() {
                 isGameOver = true;
+                clearInterval(gameIntervalId); // Stop the game loop
                 messageBox.innerText = `Game Over! Final Score: ${score}`;
                 messageBox.classList.add('animate-pulse');
-                startButton.disabled = true;
+                startButton.disabled = false;
                 pauseButton.disabled = true;
             }
 
             // Reset the game to its initial state
             function resetGame() {
+                // Clear any existing game loop
+                if (gameIntervalId) {
+                    clearInterval(gameIntervalId);
+                }
+                
                 snake = [{ x: 10, y: 10 }];
                 direction = 'right';
                 lastDirection = 'right';
                 score = 0;
-                isGameOver = true;
+                isGameOver = true; // The game is not running after reset
                 isPaused = false;
+                
                 scoreDisplay.innerText = `Score: 0`;
-                messageBox.innerText = "";
+                messageBox.innerText = "Press Start to Play!";
                 messageBox.classList.remove('animate-pulse');
+                
+                // Reset button states
                 startButton.disabled = false;
                 pauseButton.disabled = true;
+                
                 draw(); // Draw the initial state
             }
 
@@ -193,7 +203,7 @@
 
             // Handle keyboard input for movement
             function handleKeyPress(e) {
-                if (isGameOver) return;
+                if (isGameOver || isPaused) return;
 
                 const keyPressed = e.key;
                 switch (keyPressed) {
@@ -214,12 +224,13 @@
 
             // Handle touch input for swipe gestures on mobile
             function handleTouchStart(e) {
+                if (isGameOver || isPaused) return;
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
             }
 
             function handleTouchMove(e) {
-                if (!touchStartX || !touchStartY || isGameOver) {
+                if (!touchStartX || !touchStartY || isGameOver || isPaused) {
                     return;
                 }
                 
@@ -247,15 +258,17 @@
             // Start the game
             function startGame() {
                 if (!isGameOver) return; // Prevent multiple starts
+                
+                // Reset to a clean state before starting
+                resetGame(); 
+
                 isGameOver = false;
-                isPaused = false;
                 messageBox.innerText = "Enjoy!";
-                messageBox.classList.remove('animate-pulse');
                 startButton.disabled = true;
                 pauseButton.disabled = false;
-                resetGame(); // Ensure the game is in a clean state
+
                 spawnFood();
-                gameLoop();
+                gameIntervalId = setInterval(gameLoop, GAME_SPEED);
             }
 
             // Pause/Unpause the game
@@ -275,7 +288,7 @@
 
             // --- INITIALIZATION AND EVENT LISTENERS ---
             window.onload = function() {
-                draw(); // Draw the initial empty grid
+                resetGame(); // Initial setup of the game
                 startButton.addEventListener('click', startGame);
                 pauseButton.addEventListener('click', togglePause);
                 resetButton.addEventListener('click', resetGame);
